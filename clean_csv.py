@@ -3,7 +3,9 @@ from pathlib import Path
 import sys
 
 def load_csv(file_name):
-    file_path = Path(file_name).resolve().absolute()
+    file_path = Path(file_name).resolve()
+    if not file_path.exists():
+        sys.exit(f"Error: file '{file_name}' not found.")
     with open(file_path, encoding="utf-8-sig") as csv_file:
         csv_reader = csv.DictReader(csv_file)
         return list(csv_reader)
@@ -50,7 +52,7 @@ def remove_duplicates(flagged_rows, clean_rows, column_id):
     for row in clean_rows:
         key = row[column_id] if column_id else tuple(row.values())
         if key in seen:
-            row["error"] = f"duplicate in column {column_id}"
+            row["error"] = f"duplicate id: {column_id}"
             flagged_rows.append(row)
         else:
             new_clean.append(row)
