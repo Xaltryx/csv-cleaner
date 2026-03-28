@@ -13,7 +13,7 @@ Given any raw CSV file, **CSV Cleaner** produces two output files:
 | `yourfile_cleaned_data.csv` | Rows that passed all checks |
 | `yourfile_flagged_data.csv` | Rows that failed, with an `error` column explaining why |
 
-No config files. No setup. Just point it at a CSV and go.
+Two versions: `clean_csv.py` (stdlib only, zero dependencies) and `clean_csv_v2.py` (pandas variant). No config files. No setup.
 
 ---
 
@@ -168,4 +168,4 @@ pytest test_clean_csv_v2.py -v
 
 ## Author
 
-Built by [Xaltryx](https://github.com/Xaltryx) — Python automation tools for real business workflows.
+Built by [Youssef Sayed (Xaltryx)](https://github.com/Xaltryx) — MIT-bound. Building from Egypt.
