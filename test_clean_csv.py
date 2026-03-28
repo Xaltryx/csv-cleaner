@@ -1,4 +1,4 @@
-# test_clean_csv.py
+# test_clean_csv_v2.py
 from clean_csv import strip_whitespace
 from clean_csv import flag_bad_values
 
