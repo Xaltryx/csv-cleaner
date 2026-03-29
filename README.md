@@ -13,24 +13,38 @@ Given any raw CSV file, **CSV Cleaner** produces two output files:
 | `yourfile_cleaned_data.csv` | Rows that passed all checks |
 | `yourfile_flagged_data.csv` | Rows that failed, with an `error` column explaining why |
 
-Two versions: `clean_csv.py` (stdlib only, zero dependencies) and `clean_csv_v2.py` (pandas variant). No config files. No setup.
+No config files. No setup. Just point it at a CSV and go.
+
+---
+
+## What's New in v2
+
+- ✅ **`N/A` added** to bad value detection (both variants now flag `ERROR`, `UNKNOWN`, `NULL`, `N/A`)
+- ✅ **Pandas variant** (`clean_csv_v2.py`) — full feature parity, vectorized for large files
+- ✅ **Precise duplicate error messages** — error now includes the duplicate value, not just the column name
+- ✅ **Precise missing-value errors** — names the exact affected columns per row
+- ✅ **Full pytest coverage** — 5 tests for the pandas variant, 2 for stdlib
 
 ---
 
 ## Features
 
-- ✂️ **Whitespace stripping** — Trims leading/trailing spaces from every cell
-- 🚩 **Bad value detection** — Flags rows containing `ERROR`, `UNKNOWN`, `NULL`, or `N/A`
-- ❓ **Missing value detection** — Flags rows with empty fields and names the affected columns
-- 🔁 **Duplicate detection** — Flags duplicate rows by a specified ID column, or by full row if no ID is given
-- 📁 **Two clean outputs** — Always produces a cleaned file and a flagged file, side by side
+| Feature | `clean_csv.py` (stdlib) | `clean_csv_v2.py` (pandas) |
+|---|:---:|:---:|
+| Whitespace stripping | ✅ | ✅ |
+| Bad value detection (`ERROR`, `UNKNOWN`, `NULL`, `N/A`) | ✅ | ✅ |
+| Missing value detection (column-level reporting) | ✅ | ✅ |
+| Duplicate detection (by ID column or full row) | ✅ | ✅ |
+| Two clean output files | ✅ | ✅ |
+| Vectorized performance | ❌ | ✅ |
+| Handles large files efficiently | ⚠️ | ✅ |
 
 ---
 
 ## Requirements
 
 - Python 3.9+
-- `clean_csv.py` — stdlib only, no dependencies
+- `clean_csv.py` — stdlib only, zero dependencies
 - `clean_csv_v2.py` — requires `pandas` (`pip install pandas`)
 
 ---
@@ -70,6 +84,11 @@ python clean_csv.py customers.csv
 python clean_csv.py customers.csv customer_id
 ```
 
+**Pandas variant — same interface:**
+```bash
+python clean_csv_v2.py customers.csv customer_id
+```
+
 **Interactive mode (no arguments):**
 ```bash
 python clean_csv.py
@@ -88,40 +107,44 @@ customer_id,name,email,status
 002,Bob,,active
 003,Carol,carol@example.com,NULL
 001,Alice,alice@example.com,active
-004,Dave,dave@example.com,active
+004,Dave,dave@example.com,N/A
 ```
 
 **Output: `customers_cleaned_data.csv`**
 ```
 customer_id,name,email,status
 001,Alice,alice@example.com,active
-004,Dave,dave@example.com,active
 ```
 
 **Output: `customers_flagged_data.csv`**
 ```
 customer_id,name,email,status,error
 002,Bob,,active,"missing value in column: ['email']"
-003,Carol,carol@example.com,NULL,contains ERROR/UNKNOWN/NULL
+003,Carol,carol@example.com,NULL,contains ERROR/UNKNOWN/NULL/N/A
 001,Alice,alice@example.com,active,duplicate id: 001
+004,Dave,dave@example.com,N/A,contains ERROR/UNKNOWN/NULL/N/A
 ```
 
 ---
 
 ## How It Works
 
-The cleaner runs each row through a pipeline of checks, in order:
+Each row passes through a sequential pipeline:
 
 ```
 Load CSV → Strip Whitespace → Flag Bad Values → Flag Missing Values → Remove Duplicates → Save Outputs
 ```
 
-1. **Load** — Reads the file with UTF-8 BOM support for Excel compatibility
-2. **Strip whitespace** — Applies `.str.strip()` across all string columns
-3. **Flag bad values** — Case-insensitive match against `ERROR`, `UNKNOWN`, `NULL`, `N/A`
-4. **Flag missing values** — Detects empty cells and records which columns are affected
-5. **Remove duplicates** — Tracks seen keys; routes second occurrences to the flagged file with a reason
-6. **Save** — Writes `_cleaned_data.csv` and `_flagged_data.csv` with UTF-8 BOM encoding
+| Step | What it does |
+|---|---|
+| **Load** | Reads the file with UTF-8 BOM support for Excel compatibility |
+| **Strip whitespace** | Trims all leading/trailing spaces from every string cell |
+| **Flag bad values** | Case-insensitive match against `ERROR`, `UNKNOWN`, `NULL`, `N/A` |
+| **Flag missing values** | Detects empty cells; records the exact affected column names |
+| **Remove duplicates** | Routes second occurrences to flagged file with the duplicate value in the error reason |
+| **Save** | Writes `_cleaned_data.csv` and `_flagged_data.csv` with UTF-8 BOM encoding |
+
+> **Pipeline note:** A row exits at its first failure. A bad-value row is never also checked for duplicates. Error reasons are always unambiguous.
 
 ---
 
@@ -131,8 +154,8 @@ Load CSV → Strip Whitespace → Flag Bad Values → Flag Missing Values → Re
 |---|---|
 | File not found | Exits with a clear message |
 | File is empty | Exits with a clear message |
-| ID column doesn't exist in file | Exits and lists available columns |
-| Row has bad value AND is a duplicate | Flagged for bad value first (pipeline order) |
+| ID column doesn't exist | Exits and lists available columns |
+| Row has bad value AND missing field | Flagged at bad-value step (pipeline order) |
 
 ---
 
@@ -140,8 +163,8 @@ Load CSV → Strip Whitespace → Flag Bad Values → Flag Missing Values → Re
 
 ```
 csv-cleaner/
-├── clean_csv.py          # Main cleaner (stdlib only, no dependencies)
-├── clean_csv_v2.py       # Pandas-based variant
+├── clean_csv.py          # Stdlib-only cleaner — zero dependencies
+├── clean_csv_v2.py       # Pandas-powered variant — vectorized, handles large files
 ├── test_clean_csv.py     # Unit tests for clean_csv.py
 ├── test_clean_csv_v2.py  # Unit tests for clean_csv_v2.py
 └── README.md
@@ -162,10 +185,33 @@ pip install pytest pandas
 pytest test_clean_csv_v2.py -v
 ```
 
-> **Note:** `test_load_csv` in `test_clean_csv_v2.py` expects a `customers.csv` file in the working directory.
+**Test coverage — `test_clean_csv_v2.py`:**
+
+| Test | What it verifies |
+|---|---|
+| `test_strip_whitespace` | String cells stripped; numeric columns untouched |
+| `test_flag_bad_value` | All 3 bad rows caught; clean list is empty |
+| `test_load_csv` | File loads as a non-empty DataFrame *(requires `customers.csv`)* |
+| `test_flag_missing_values` | 2 NaN rows flagged; 1 clean row passes |
+| `test_remove_duplicates` | Full-row and ID-column dedup both verified across 4 scenarios |
+
+> **Note:** `test_load_csv` expects a `customers.csv` file in the working directory.
+
+---
+
+## Choosing a Variant
+
+| Use case | Recommended |
+|---|---|
+| Simple scripts, no extra dependencies | `clean_csv.py` |
+| Large files (10k+ rows) | `clean_csv_v2.py` |
+| Integrating into a pandas pipeline | `clean_csv_v2.py` |
+| Lightweight / auditing environments | `clean_csv.py` |
+
+Both variants produce **identical output files** and accept the **same CLI arguments**.
 
 ---
 
 ## Author
 
-Built by [Youssef Sayed (Xaltryx)](https://github.com/Xaltryx) — MIT-bound. Building from Egypt.
+Built by [Xaltryx](https://github.com/Xaltryx) — Python automation tools for real business workflows.
